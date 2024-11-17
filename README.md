@@ -26,8 +26,5 @@ The dataset includes the following variables:
    - Assessed the model's goodness-of-fit and statistical significance.
 
 3. **Residual Analysis**:
-   - Validated the assumptions of linear regression:
-     - Linearity
-     - Normality of residuals
-     - Homoscedasticity (equal variance of residuals)
+   - Validated the assumptions of linear regression
 
