@@ -1,0 +1,141 @@
+---
+title: "HW6_Sonam"
+author: "sonam.rathod@rutgers.edu"
+date: "2024-11-16"
+output: html_document
+---
+
+#### Find an independent variable to predict your time-series (2 points)
+
+**Dependent variable** - the number of baggage complaints (Baggage)
+
+**Independent variables** - Scheduled, Cancelled, and Enplaned
+
+```{r}
+library(forecast)
+library(ggplot2)
+
+baggagecomplaints <- read.csv("~/Downloads/baggagecomplaints.csv")
+plot(baggagecomplaints$Scheduled, baggagecomplaints$Baggage,
+     xlab = "Scheduled Flights",
+     ylab = "Baggage Complaints",
+     main = "Baggage Complaints vs. Scheduled Flights")
+
+plot(baggagecomplaints$Enplaned, baggagecomplaints$Baggage,
+     xlab = "Enplaned Passengers",
+     ylab = "Baggage Complaints",
+     main = "Baggage Complaints vs. Enplaned Passengers")
+
+# Plot Baggage vs. Cancelled
+plot(baggagecomplaints$Cancelled, baggagecomplaints$Baggage,
+     xlab = "Cancelled Flights",
+     ylab = "Baggage Complaints",
+     main = "Baggage Complaints vs. Cancelled Flights")
+
+pairs(~ Baggage + Scheduled + Enplaned + Cancelled, data = baggagecomplaints,
+      main = "Pairwise Scatter Plots")
+numeric_data <- baggagecomplaints[, !(names(baggagecomplaints) %in% c("Month", "Year", "Airline"))]
+
+numeric_data <- numeric_data[, sapply(numeric_data, is.numeric)]
+cor(numeric_data)
+```
+
+##### Based on correlation matrix, Baggage complaints has highest correlation with Schedule (0.81744), hence, selecting Scheduled as the independent variable for predicting baggage complaints.
+
+
+#### Perform regression (2 Points)
+```{r}
+mfit <- lm(Baggage ~ Scheduled, data = baggagecomplaints)
+plot(baggagecomplaints$Scheduled, baggagecomplaints$Baggage, col = "blue", pch=19,
+     main = "Baggage Complaints vs. Scheduled Flights",
+     xlab = "Scheduled Flights", ylab = "Baggage Complaints")
+abline(mfit, col = "red", lwd = 2)
+```
+
+#### Perform Model Acceptance Steps and show the interpretation of the model output (3 Points)
+```{r}
+summary(mfit) 
+```
+
+When there are zero scheduled flights, the predicted number of baggage complaints is -830.02, which is practically not possible.
+For every additional scheduled flight, the number of baggage complaints is predicted to increase by 0.4779 on average. The coefficient is highly significant with p-value.
+Multiple R-squared:  0.6682, Adjusted R-squared:  0.6669 66.8% of the variance in Baggage is explained by Scheduled.
+
+F-statistic = 503.5, p-value < 2.2e-16:
+The model is highly significant. This confirms that the Scheduled flight has a significant impact on the Baggage Complaints.
+
+#### Perform Residual Analysis and explain the insights (3 Points)
+```{r}
+res <- residuals(mfit)
+hist(res, main = "Histogram of Residuals", xlab = "Residuals")
+
+```
+
+The histogram shows that the residuals are asymmetric, there appears to be some skewness.
+
+```{r}
+plot(res ~ baggagecomplaints$Scheduled, 
+     xlab = "Scheduled Flights", ylab = "Residuals",
+     main = "Residuals vs Scheduled Flights", pch = 19, col = "blue")
+abline(h = 0, col = "red", lty = 2)
+```
+
+The residuals are generally scattered around zero with no clear pattern. This indicates that the linear model is appropriately capturing the relationship between Scheduled Flights and Baggage Complaints.
+
+```{r}
+library(forecast)
+forecast_val <- forecast(mfit, newdata = data.frame(Scheduled = 50000))
+print(forecast_val)
+plot(forecast_val, xlab = "Scheduled Flights", ylab = "Baggage Complaints")
+confint(mfit, level = 0.95)
+
+par(mfrow = c(1, 2)) # Split plot area
+fit_log <- lm(log(baggagecomplaints$Baggage) ~ log(baggagecomplaints$Scheduled), data = baggagecomplaints)
+
+# Plot 1: Original Scale
+plot(Baggage ~ Scheduled, data = baggagecomplaints, 
+     xlab = "Scheduled Flights", ylab = "Baggage Complaints",
+     main = "Original Scale",
+     pch = 19, col = "blue")
+lines(1:max(baggagecomplaints$Scheduled), exp(fit_log$coef[1] + fit_log$coef[2] * log(1:max(baggagecomplaints$Scheduled))), col = "red")
+
+# Plot 2: Log-Log Scale
+plot(log(baggagecomplaints$Baggage) ~ log(baggagecomplaints$Scheduled), data = baggagecomplaints, 
+     xlab = "Log(Scheduled Flights)", ylab = "Log(Baggage Complaints)",
+     main = "Log-Log Scale",
+     pch = 19, col = "blue")
+abline(fit_log, col = "red")
+
+# Residual Plot for Transformed Model
+par(mfrow = c(1, 1)) # Reset plot area
+log_res <- residuals(fit_log)
+plot(log_res ~ log(baggagecomplaints$Scheduled), 
+     xlab = "Log(Scheduled Flights)", ylab = "Residuals",
+     main = "Residuals for Log-Transformed Model",
+     pch = 19, col = "blue")
+abline(h = 0, col = "red", lty = 2)
+```
+
+### Multiple regression
+
+```{r}
+multi_model <- lm(baggagecomplaints$Baggage ~ baggagecomplaints$Scheduled + baggagecomplaints$Cancelled + baggagecomplaints$Enplaned, data = baggagecomplaints)
+summary(multi_model)
+
+coefficients(multi_model)  
+confint(multi_model, level = 0.95) 
+
+# Residual Analysis
+# Residuals vs Fitted
+plot(multi_model$fitted.values, residuals(multi_model), 
+     xlab = "Fitted Values", ylab = "Residuals",
+     main = "Residuals vs Fitted Values", pch = 19, col = "blue")
+abline(h = 0, col = "red", lty = 2)
+
+# Histogram of Residuals
+hist(residuals(multi_model), main = "Histogram of Residuals", 
+     xlab = "Residuals", border = "black")
+
+```
+
+Each canceled flight increases complaints. Schedule flight has moderate impact whereas Enplaned has small impact on baggage complaints. 
