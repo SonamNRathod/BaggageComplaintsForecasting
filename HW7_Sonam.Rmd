@@ -1,0 +1,195 @@
+---
+title: "HW7_Sonam"
+author: "Sonam Rathod"
+date: "2024-11-21"
+output: html_document
+---
+
+# ARIMA
+
+#### 1. Explain the output
+```{r}
+library(dplyr)
+library(forecast)
+baggagecomplaints <- read.csv("~/Downloads/baggagecomplaints.csv")
+
+baggageUnited <- baggagecomplaints %>%
+  filter(Airline == "United")
+
+united_ts <- ts(baggageUnited$Baggage, start = c(2004, 1), end = c(2010,12), frequency = 12)
+plot(united_ts, main = "Monthly Complaints (United Airlines)", xlab = "Year", ylab = "Complaints")
+
+baggageAmerican <- baggagecomplaints %>%
+  filter(Airline == "American Eagle")
+
+american_ts <- ts(baggageAmerican$Baggage, start = c(2004, 1), end = c(2010,12), frequency = 12)
+plot(american_ts, main = "Monthly Complaints (American Eagle)", xlab = "Year", ylab = "Complaints")
+
+baggageHawaiian <- baggagecomplaints %>%
+  filter(Airline == "Hawaiian")
+
+hawaiian_ts <- ts(baggageHawaiian$Baggage, start = c(2004, 1), end = c(2010,12), frequency = 12)
+plot(hawaiian_ts, main = "Monthly Complaints (Hawaiian)", xlab = "Year", ylab = "Complaints")
+
+# United Airlines ARIMA
+
+united_model <- auto.arima(united_ts, trace = TRUE, stepwise = FALSE)
+summary(united_model)
+
+# American Eagle ARIMA
+american_model <- auto.arima(american_ts, trace = TRUE, stepwise = FALSE)
+summary(american_model)
+
+# Hawaiian ARIMA
+hawaiian_model <- auto.arima(hawaiian_ts, trace = TRUE, stepwise = FALSE)
+summary(hawaiian_model)
+```
+
+**United Airlines** Best model: ARIMA(0,1,0)(2,1,0)[12]
+
+1. No autoregressive terms are included.
+
+2. Data was differenced once to achieve stationarity.
+
+3. No moving average terms are included.
+
+4. The model predicts with an average error of 11.61% relative to the observed values.
+
+**American Eagle** Best model: ARIMA(3,1,1)(0,1,1)[12]
+
+1. The data was differenced once to make it stable.
+
+2. The model uses 1 moving average term
+
+3. The model uses 3 autoregressive terms
+
+4. Predictions are off by 8.77% on average, indicating high accuracy 
+
+**Hawaiian** Best model: ARIMA(1,0,0) 
+
+1. The model includes 1 autoregressive term.
+
+2. The data was already stable, so no differencing was needed.
+
+3. No moving average (MA) component is used.
+
+4. MAPE (13.46%): Predictions are about 13.46% off from actual complaints on average.
+
+
+#### 2. Run Residual Analysis
+```{r}
+united_residuals <- residuals(united_model)
+american_residuals <- residuals(american_model)
+hawaiian_residuals <- residuals(hawaiian_model)
+
+residuals_df <- data.frame(
+  Time = time(united_residuals),
+  United = as.numeric(united_residuals),
+  American = as.numeric(american_residuals),
+  Hawaiian = as.numeric(hawaiian_residuals)
+)
+
+par(mfrow = c(3, 1))
+plot(united_residuals, main = "Residuals for United Airlines", ylab = "Residuals", col = "blue")
+abline(h = 0, col = "red", lty = 2)
+plot(american_residuals, main = "Residuals for American Eagle", ylab = "Residuals", col = "green")
+abline(h = 0, col = "red", lty = 2)
+plot(hawaiian_residuals, main = "Residuals for Hawaiian Airlines", ylab = "Residuals", col = "purple")
+abline(h = 0, col = "red", lty = 2)
+
+par(mfrow = c(3, 1))
+hist(united_residuals, main = "Histogram of Residuals (United)", col = "blue", xlab = "Residuals")
+hist(american_residuals, main = "Histogram of Residuals (American Eagle)", col = "green", xlab = "Residuals")
+hist(hawaiian_residuals, main = "Histogram of Residuals (Hawaiian)", col = "purple", xlab = "Residuals")
+
+
+par(mfrow = c(3, 1))
+Acf(united_residuals, main = "ACF of Residuals (United)")
+Acf(american_residuals, main = "ACF of Residuals (American Eagle)")
+Acf(hawaiian_residuals, main = "ACF of Residuals (Hawaiian)")
+
+united_lb <- Box.test(united_residuals, lag = 20, type = "Ljung-Box")
+american_lb <- Box.test(american_residuals, lag = 20, type = "Ljung-Box")
+hawaiian_lb <- Box.test(hawaiian_residuals, lag = 20, type = "Ljung-Box")
+
+print("Ljung-Box Test Results:")
+print(united_lb)
+print(american_lb)
+print(hawaiian_lb)
+
+residual_stats <- data.frame(
+  Airline = c("United", "American Eagle", "Hawaiian"),
+  Variance = c(var(united_residuals), var(american_residuals), var(hawaiian_residuals)),
+  Mean = c(mean(united_residuals), mean(american_residuals), mean(hawaiian_residuals)),
+  SD = c(sd(united_residuals), sd(american_residuals), sd(hawaiian_residuals))
+)
+print(residual_stats)
+
+```
+
+**United Airlines** - The distribution is centered around zero, which suggests normal distribution.
+
+**American Eagle** - The histogram shows a reasonably symmetrical distribution around zero.
+
+**Hawaiian** - The histogram shows a symmetrical distribution around zero.
+
+#### 3. Perform and Plot the forecast for the next five periods
+```{r}
+united_forecast <- forecast(united_model, h = 5)
+plot(united_forecast, main = "5-Month Forecast for United Airlines", xlab = "Year", ylab = "Complaints")
+
+american_forecast <- forecast(american_model, h = 5)
+plot(american_forecast, main = "5-Month Forecast for American Eagle", xlab = "Year", ylab = "Complaints")
+
+hawaiian_forecast <- forecast(hawaiian_model, h = 5)
+plot(hawaiian_forecast, main = "5-Month Forecast for Hawaiian Airlines", xlab = "Year", ylab = "Complaints")
+
+print("United Airlines Forecast:")
+print(united_forecast)
+
+print("American Eagle Forecast:")
+print(american_forecast)
+
+print("Hawaiian Airlines Forecast:")
+print(hawaiian_forecast)
+
+```
+
+**United Airlines**
+
+- For January 2011, complaints are expected to be around 7,048
+
+- The forecast is less reliable and shows high uncertainty.
+
+**American Eagle**
+
+- For the next 5 months, the predicted complaints are more stable, ranging from 5,335 to 9,013 on average.
+
+
+**Hawaiian Airlines**
+
+- Complaints for the next 5 months are predicted to remain low and stable, around 2,437 in January 2011.
+
+#### 4. Show the accuracy of your ARIMA model
+```{r}
+united_accuracy <- accuracy(united_forecast)
+print("United Airlines Model Accuracy:")
+print(united_accuracy)
+
+american_accuracy <- accuracy(american_forecast)
+print("American Eagle Model Accuracy:")
+print(american_accuracy)
+
+hawaiian_accuracy <- accuracy(hawaiian_forecast)
+print("Hawaiian Airlines Model Accuracy:")
+print(hawaiian_accuracy)
+
+```
+
+#### Conclusion
+
+American Eagle has the lowest MAPE, indicating the most accurate model.
+
+United Airlines has moderate MAPE but still better than Hawaiian Airlines.
+
+Hawaiian Airlines higher MAPE could be due to the small scale of complaint values.
