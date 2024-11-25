@@ -1,0 +1,646 @@
+---
+title: "Airline Baggage Complaints"
+author: "Sonam Rathod"
+date: "2024-11-22"
+output: html_document
+---
+
+#### Plot and Inference
+```{r}
+library(ggplot2)
+library(forecast)
+library(dplyr)
+
+baggagecomplaints <- read.csv("~/Downloads/baggagecomplaints.csv")
+
+baggageUnited <- baggagecomplaints %>%
+  filter(Airline == "United")
+
+united_ts <- ts(baggageUnited$Baggage, start = c(2004, 1), end = c(2010,12), frequency = 12)
+plot(united_ts, main = "Monthly Complaints (United Airlines)", xlab = "Year", ylab = "Complaints")
+
+baggageAmerican <- baggagecomplaints %>%
+  filter(Airline == "American Eagle")
+
+american_ts <- ts(baggageAmerican$Baggage, start = c(2004, 1), end = c(2010,12), frequency = 12)
+plot(american_ts, main = "Monthly Complaints (American Eagle)", xlab = "Year", ylab = "Complaints")
+
+baggageHawaiian <- baggagecomplaints %>%
+  filter(Airline == "Hawaiian")
+
+hawaiian_ts <- ts(baggageHawaiian$Baggage, start = c(2004, 1), end = c(2010,12), frequency = 12)
+plot(hawaiian_ts, main = "Monthly Complaints (Hawaiian)", xlab = "Year", ylab = "Complaints")
+
+
+baggageUnited <- baggageUnited %>% mutate(Airline = "United")
+baggageAmerican <- baggageAmerican %>% mutate(Airline = "American Eagle")
+baggageHawaiian <- baggageHawaiian %>% mutate(Airline = "Hawaiian")
+
+combined_baggage <- bind_rows(baggageUnited, baggageAmerican, baggageHawaiian)
+
+ggplot(combined_baggage, aes(x = as.Date(paste(Year, Month, "1", sep = "-")), y = Baggage, color = Airline)) +
+  geom_line(linewidth = 1) +
+  labs(title = "Monthly Baggage Complaints by Airline", x = "Year", y = "Complaints") +
+  theme_minimal() +
+  scale_color_manual(values = c("blue", "red", "green"))
+
+ggplot(combined_baggage, aes(x = as.Date(paste(Year, Month, "1", sep = "-")), y = Baggage)) +
+  geom_line(aes(color = Airline), linewidth = 1) +
+  facet_wrap(~Airline, scales = "free_y") + # Facet by airline
+  labs(title = "Monthly Baggage Complaints by Airline", x = "Year", y = "Complaints") +
+  theme_minimal() +
+  scale_color_manual(values = c("blue", "red", "green"))
+
+# Aggregate total baggage complaints by Year and Airline
+baggage_by_year <- baggagecomplaints %>%
+  group_by(Year, Airline) %>%
+  summarise(Total_Baggage_Complaints = sum(Baggage, na.rm = TRUE))
+
+ggplot(baggage_by_year, aes(x = factor(Year), y = Total_Baggage_Complaints, fill = Airline)) +
+  geom_bar(stat = "identity", position = "dodge") +  # Dodge separates bars by airline
+  theme_minimal() +
+  labs(
+    title = "Total Baggage Complaints by Airline and Year",
+    x = "Year",
+    y = "Total Baggage Complaints",
+    fill = "Airline"
+  ) +
+  scale_fill_manual(
+    values = c("American Eagle" = "#FF9999", "Hawaiian" = "#99CCFF", "United" = "#FFCC99")
+  ) +
+  theme(
+    plot.title = element_text(hjust = 0.5, face = "bold", size = 14),
+    axis.title = element_text(size = 12),
+    axis.text = element_text(size = 10)
+  )
+```
+
+**United Airline**
+
+- Most Complaints: United has the highest number of baggage complaints almost every month and year compared to the other two airlines.
+
+- Complaints shot up a lot during 2006-2007, meaning something might have gone wrong—maybe too many passengers, poor baggage   handling, or other   issues.
+
+- After 2007, complaints started going down steadily, showing that United probably made changes to fix their baggage issues.
+
+**American Eagle Airline**
+
+- Moderate Complaints: American Eagle has fewer complaints than United but still more than Hawaiian.
+
+- Complaints go up and down a lot, especially during busy travel times like summer and the holiday season.
+
+- Like United, American Eagle’s complaints also started decreasing after 2007.
+
+**Hawaiian Airline**
+
+- Lowest Complaints: Hawaiian Airlines has the least baggage complaints out of all three airlines, and the numbers stay consistently low throughout the years.
+
+- Unlike the other two airlines, Hawaiian’s complaints don’t spike much, showing they handle baggage well no matter the season.
+
+```{r}
+
+united_window <- window(united_ts, start = c(2007, 1), end = c(2010,12), frequency = 12)
+american_window <- window(american_ts, start = c(2007, 1), end = c(2010,12), frequency = 12)
+hawaiian_window <- window(hawaiian_ts, start = c(2007, 1), end = c(2010,12), frequency = 12)
+par(mfrow = c(1, 3)) 
+plot(united_window, main = "Monthly Complaints United Airlines", 
+     xlab = "Year", ylab = "Complaints", col = "green")
+plot(american_window, main = "Monthly Complaints American Eagle", 
+     xlab = "Year", ylab = "Complaints", col = "blue")
+plot(hawaiian_window, main = "Monthly Complaints Hawaiian", 
+     xlab = "Year", ylab = "Complaints", col = "red")
+
+summary(united_window)
+summary(american_window)
+summary(hawaiian_window)
+```
+
+**United Airlines**
+
+- Has the highest complaints across all metrics, indicating significant challenges in baggage handling.
+- Their average (20315) and maximum (41787) complaints highlight operational inefficiencies, especially during peak months.
+
+**American Eagle**
+
+- Performs better than United but still has more complaints than Hawaiian Airlines.
+- Their average (13393) and maximum (26213) complaints suggest room for improvement, particularly during busy periods.
+
+**Hawaiian Airlines**
+
+- Consistently outperforms both United and American Eagle in baggage handling.
+- Their average (1729) and maximum (2791) complaints are significantly lower, showcasing their reliable operations.
+
+```{r}
+
+par(mfrow = c(1, 3)) 
+
+boxplot(united_window, main = "Monthly Complaints United Airlines")
+boxplot(american_window, main = "Monthly Complaints American Eagle")
+boxplot(hawaiian_window, main = "Monthly Complaints Hawaiian Airlines")
+
+acf(united_window, main = "ACF: United Airlines", col = "green", lwd = 2)
+
+acf(american_window, main = "ACF: American Eagle", col = "blue", lwd = 2)
+
+acf(hawaiian_window, main = "ACF: Hawaiian Airlines", col = "red", lwd = 2)
+```
+
+**United Airlines**
+
+- Both seasonality and trend are significant factors. Complaints tend to increase during specific seasons and persist for multiple months.
+
+**American Eagle**
+
+- Shows weaker seasonality and trend compared to United. Complaints might still rise slightly during peak travel periods but don’t persist long.
+
+**Hawaiian Airlines**
+
+- No seasonal influence or trend is visible. Complaints remain stable and consistent across all months.
+
+```{r}
+united_decomp <- decompose(united_window)
+american_decomp <- decompose(american_window)
+hawaiian_decomp <- decompose(hawaiian_window)
+plot(united_decomp)
+plot(american_decomp)
+plot(hawaiian_decomp)
+```
+
+- United Airlines has a clear seasonal pattern with a long-term downward trend, indicating gradual improvement over time.
+- American Eagle shows a declining trend with weaker seasonal patterns. 
+- Hawaiian Airlines shows minimal seasonal effects and no significant trend, reflecting a stable and well-managed baggage handling system.
+
+#### Accuracy Measures
+Going with MAPE as it measures the accuracy of a forecast model as a percentage and easy to interpret.
+
+#### Forecasting Model
+```{r}
+par(mfrow = c(1, 3))
+
+united_naive <- naive(united_window, h = 12)
+plot(united_naive, main = "Naive Forecast: United Airlines",
+     xlab = "Year", ylab = "Complaints", col = "green")
+
+american_naive <- naive(american_window, h = 12)
+plot(american_naive, main = "Naive Forecast: American Eagle",
+     xlab = "Year", ylab = "Complaints", col = "blue")
+
+hawaiian_naive <- naive(hawaiian_window, h = 12)
+plot(hawaiian_naive, main = "Naive Forecast: Hawaiian Airlines",
+     xlab = "Year", ylab = "Complaints", col = "red")
+
+par(mfrow = c(1, 1))
+
+```
+
+**Naive Model**: The simplest model, forecasting that future values will be the same as the last observed value. The forecasted line is constant and flat for the next 12 months. This model is simple and works well when no clear trend or seasonality, though it may not be very accurate for time series data with trends or seasonal patterns
+
+#### Residual Analysis
+
+```{r}
+residuals_naive_united <- residuals(united_naive)
+fitted_naive_united <- fitted(united_naive)
+
+residuals_naive_american <- residuals(american_naive)
+fitted_naive_american <- fitted(american_naive)
+
+residuals_naive_hawaiian <- residuals(hawaiian_naive)
+fitted_naive_hawaiian <- fitted(hawaiian_naive)
+
+par(mfrow = c(1, 3)) 
+plot(residuals_naive_united, main = "United Airlines (Naive Model)", 
+     ylab = "Residuals", xlab = "Time",col ='green')
+plot(residuals_naive_american, main = "American Eagle Airlines (Naive Model)", 
+     ylab = "Residuals", xlab = "Time", col ='blue')
+plot(residuals_naive_hawaiian, main = "Hawaiian Airlines (Naive Model)", 
+     ylab = "Residuals", xlab = "Time", col= 'red')
+
+hist(residuals_naive_united, main = "United Airlines (Naive Model)", xlab = "Residuals")
+hist(residuals_naive_american, main = "American Eagle Airlines (Naive Model)", xlab = "Residuals")
+hist(residuals_naive_hawaiian, main = "Hawaiian Airlines (Naive Model)", xlab = "Residuals")
+
+ggplot(data = NULL, aes(x = fitted_naive_united, y = residuals_naive_united)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: United Airlines",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = fitted_naive_american, y = residuals_naive_american)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: American Eagle ",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = fitted_naive_hawaiian, y = residuals_naive_hawaiian)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: Hawaiian Airlines",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
+## Actual Vs Residual
+ggplot(data = NULL, aes(x = united_window, y = residuals_naive_united)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: United Airlines",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = american_window, y = residuals_naive_american)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: American Eagle ",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = hawaiian_window, y = residuals_naive_hawaiian)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: Hawaiian Airlines",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+
+
+```
+
+```{r}
+united_sa <- meanf(united_window, h=12)
+american_sa <- meanf(american_window,  h=12)
+hawaiian_sa <- meanf(hawaiian_window,  h=12)
+par(mfrow = c(1, 3)) 
+
+plot(united_sa, main = "United Airlines SMA", xlab = "Year", ylab = "Complaints")
+plot(american_sa, main = "American Eagle SMA", xlab = "Year", ylab = "Complaints")
+plot(hawaiian_sa, main = "Hawaiian Airlines SMA", xlab = "Year", ylab = "Complaints")
+
+
+
+```
+
+**Simple Average Model**: This forecasts using the mean of all historical observations. It shows the flat line for future even if there is a trend or seasonality. 
+
+```{r}
+united_ma <- ma(united_window, order = 3)
+american_ma <- ma(american_window, order = 3)
+hawaiian_ma <- ma(hawaiian_window, order = 3)
+
+par(mfrow = c(1, 3)) 
+
+plot(united_window, main = "United Airlines MA", xlab = "Year", ylab = "Complaints")
+lines(united_ma, col = "red", lwd = 2)
+
+plot(american_window, main = "American Eagle MA", xlab = "Year", ylab = "Complaints")
+lines(american_ma, col = "red", lwd = 2)
+
+plot(hawaiian_window, main = "Hawaiian Airlines MA", xlab = "Year", ylab = "Complaints")
+lines(hawaiian_ma, col = "red", lwd = 2)
+
+par(mfrow = c(1, 1))
+```
+
+#### Moving Average
+
+**United Airlines** The moving average smooths out the fluctuations, highlighting the downward trend in complaints over time.
+
+**American Eagle** The moving average closely follows the data, reflecting smoother declines with smaller fluctuation.
+
+**Hawaiian Airlines** The moving average shows how stable Hawaiian Airlines is compared to the other airlines, with minimal fluctuations.
+
+```{r}
+ets_united <- ets(united_window)
+ets_american <- ets(american_window)
+ets_hawaiian <- ets(hawaiian_window)
+
+par(mfrow = c(1, 3))
+
+plot(forecast(ets_united, h = 12), main = "ETS Forecast: United Airlines", xlab = "Year", ylab = "Complaints")
+
+plot(forecast(ets_american, h = 12), main = "ETS Forecast: American Eagle", xlab = "Year", ylab = "Complaints")
+
+plot(forecast(ets_hawaiian, h = 12), main = "ETS Forecast: Hawaiian Airlines", xlab = "Year", ylab = "Complaints")
+
+par(mfrow = c(1, 1))
+
+```
+
+#### ETS Model
+
+**United Airlines**
+
+- Complaints are going down steadily over time.
+- The forecast shows that complaints will stay low and stable in the future
+
+**American Eagle**
+
+- Complaints are also decreasing, but not as fast as United Airlines.
+- The forecast predicts complaints will drop per month.
+
+**Hawaiian Airlines**
+
+- Complaints are very steady with only small ups and downs over time.
+- The forecast predicts complaints will stay low.
+
+```{r}
+summary(ets_united)   
+summary(ets_american)   
+summary(ets_hawaiian) 
+```
+
+**United Airlines**
+
+- Alpha = 0.3861, The model gives some weight to recent complaints but also considers historical data.
+- Beta = 0.0001, very low, slow change in trend
+- Gamma = 0.0002 very low, seasonal patterns are stable.
+
+**American Eagle**
+
+- Aplha = 0.5059, the model reacts more quickly to changes in the level.
+- Beta = 0.0001, very low, slow change in trend
+- Gamma = 0.0001, Very low. Seasonal patterns remain stable over time.
+
+**Hawaiian Airlines**
+
+- Alpha = 0.9999, Strong reliance on the most recent data, there is no trend or seasonality.
+
+#### Residual Analysis
+```{r}
+residuals_ets_united <- residuals(ets_united)
+fitted_ets_united <- fitted(ets_united)
+
+residuals_ets_american <- residuals(ets_american)
+fitted_ets_american <- fitted(ets_american)
+
+residuals_ets_hawaiian <- residuals(ets_hawaiian)
+fitted_ets_hawaiian <- fitted(ets_hawaiian)
+
+par(mfrow = c(1, 3)) 
+plot(residuals_ets_united, main = "United Airlines (ETS)", 
+     ylab = "Residuals", xlab = "Time",col ='green')
+plot(residuals_ets_american, main = "American Eagle Airlines (ETS)", 
+     ylab = "Residuals", xlab = "Time", col ='blue')
+plot(residuals_ets_hawaiian, main = "Hawaiian Airlines (ETS)", 
+     ylab = "Residuals", xlab = "Time", col= 'red')
+
+hist(residuals_ets_united, main = "United Airlines (ETS)", xlab = "Residuals")
+hist(residuals_ets_american, main = "American Eagle Airlines ETS", xlab = "Residuals")
+hist(residuals_ets_hawaiian, main = "Hawaiian Airlines (ETS)", xlab = "Residuals")
+
+ggplot(data = NULL, aes(x = fitted_ets_united, y = residuals_ets_united)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: United Airlines",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = fitted_ets_american, y = residuals_ets_american)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: American Eagle ",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = fitted_ets_hawaiian, y = residuals_ets_hawaiian)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: Hawaiian Airlines",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
+## Actual Vs Residual
+ggplot(data = NULL, aes(x = united_window, y = residuals_ets_united)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: United Airlines",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = american_window, y = residuals_ets_american)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: American Eagle ",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = hawaiian_window, y = residuals_ets_hawaiian)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: Hawaiian Airlines",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+```
+
+```{r}
+hw_united <- hw(united_window, h = 12)     
+hw_american <- hw(american_window, h = 12) 
+hw_hawaiian <- hw(hawaiian_window, h = 12) 
+
+par(mfrow = c(1, 3))  
+
+plot(hw_united, main = "Holt-Winters Forecast: United", xlab = "Year", ylab = "Complaints")
+plot(hw_american, main = "Holt-Winters Forecast: American Eagle", xlab = "Year", ylab = "Complaints")
+plot(hw_hawaiian, main = "Holt-Winters Forecast: Hawaiian ", xlab = "Year", ylab = "Complaints")
+
+par(mfrow = c(1, 1))
+```
+
+#### Holt-Winters Forecast
+
+**United Airlines**
+
+- Complaints are expected to continue declining steadily.
+- United Airlines is making progress in reducing complaints, but attention should still be given to peak complaint months to further improve customer satisfaction.
+
+**American Eagle**
+
+- Complaints are predicted to drop.
+- Improvements are visible but focus should shift toward maintaining current levels of performance.
+
+**Hawaiian Airlines**
+
+- Complaints are expected to remain stable
+- Hawaiian Airlines demonstrates a stable and reliable performance in handling complaints. Efforts should focus on maintaining this level of consistency.
+
+```{r}
+summary(hw_united)  
+summary(hw_american)  
+summary(hw_hawaiian)
+```
+
+**United Airlines**
+
+- Alpha = 0.621, The model reacts moderately to changes in the level, giving a fair balance to recent and historical data.
+- Beta = 0.0001, The trend changes very slowly.
+- Gamma = 0.0001, Seasonal changes are minimal and evolve very slowly.
+- Focus on high-complaint months to further improve customer satisfaction.
+
+**American Eagle**
+
+- Alpha = 0.5743,  the model reacts moderately to level changes.
+- Beta = 0.0003, The trend changes slightly faster than United 
+- Gamma = 0.0321, Seasonal adjustments are slightly more compared to United Airlines.
+- Monitor months with seasonal peaks and optimize operations during these periods.
+
+**Hawaiian Airlines**
+
+- Alpha = 0.9226, the model heavily relies on recent data,
+- Beta = 0.0001, Negligible trend, as complaints remain stable.
+- Gamma = 0.0001, Seasonal adjustments are minimal 
+- Maintain consistency in operations to keep complaints stable.
+- Address occasional spikes in complaints.
+
+#### Residual Analysis
+```{r}
+residuals_hw_united <- residuals(hw_united)
+fitted_hw_united <- fitted(hw_united)
+
+residuals_hw_american <- residuals(hw_american)
+fitted_hw_american <- fitted(hw_american)
+
+residuals_hw_hawaiian <- residuals(hw_hawaiian)
+fitted_hw_hawaiian <- fitted(hw_hawaiian)
+
+par(mfrow = c(1, 3)) 
+plot(residuals_hw_united, main = "United Airlines (/hw)", 
+     ylab = "Residuals", xlab = "Time",col ='green')
+plot(residuals_hw_american, main = "American Eagle Airlines (HW)", 
+     ylab = "Residuals", xlab = "Time", col ='blue')
+plot(residuals_hw_hawaiian, main = "Hawaiian Airlines (HW)", 
+     ylab = "Residuals", xlab = "Time", col= 'red')
+
+hist(residuals_hw_united, main = "United Airlines (HW)", xlab = "Residuals")
+hist(residuals_hw_american, main = "American Eagle Airlines HW", xlab = "Residuals")
+hist(residuals_hw_hawaiian, main = "Hawaiian Airlines (HW)", xlab = "Residuals")
+
+ggplot(data = NULL, aes(x = fitted_hw_united, y = residuals_hw_united)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: United Airlines",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = fitted_hw_american, y = residuals_hw_american)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: American Eagle ",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = fitted_hw_hawaiian, y = residuals_hw_hawaiian)) +
+  geom_point(color = "blue") + 
+  labs(title = "Fitted vs Residuals: Hawaiian Airlines",
+       x = "Fitted Values", y = "Residuals") +
+  theme_minimal()
+
+## Actual Vs Residual
+ggplot(data = NULL, aes(x = united_window, y = residuals_hw_united)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: United Airlines",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = american_window, y = residuals_hw_american)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: American Eagle ",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+ggplot(data = NULL, aes(x = hawaiian_window, y = residuals_hw_hawaiian)) +
+  geom_point(color = "blue") + 
+  labs(title = "Actual vs Residuals: Hawaiian Airlines",
+       x = "Actual Values", y = "Residuals") +
+  theme_minimal()
+```
+
+#### Accuracy
+```{r}
+accuracy_naive_us <- accuracy(united_naive)
+accuracy_naive_am <- accuracy(american_naive)
+accuracy_naive_ha <- accuracy(hawaiian_naive)
+
+accuracy_avg_us <- accuracy(united_sa)
+accuracy_avg_am <- accuracy(american_sa)
+accuracy_avg_ha <- accuracy(hawaiian_sa)
+
+accuracy_ets_us <- accuracy(ets_united)
+accuracy_ets_am <- accuracy(ets_american)
+accuracy_ets_ha <- accuracy(ets_hawaiian)
+
+accuracy_hw_us <- accuracy(hw_united)
+accuracy_hw_am <- accuracy(hw_american)
+accuracy_hw_ha <- accuracy(hw_hawaiian)
+
+accuracy_data <- data.frame(
+  Airline = rep(c("United", "American Eagle", "Hawaiian"), each = 4), # Repeat for each airline
+  Model = rep(c("Naive", "Average", "ETS", "Holt-Winters"), 3),       # Repeat for each model
+  ME = c(
+    accuracy_naive_us["Training set", "ME"], accuracy_avg_us["Training set", "ME"], accuracy_ets_us["Training set", "ME"], accuracy_hw_us["Training set", "ME"],
+    accuracy_naive_am["Training set", "ME"], accuracy_avg_am["Training set", "ME"], accuracy_ets_am["Training set", "ME"], accuracy_hw_am["Training set", "ME"],
+    accuracy_naive_ha["Training set", "ME"], accuracy_avg_ha["Training set", "ME"], accuracy_ets_ha["Training set", "ME"], accuracy_hw_ha["Training set", "ME"]
+  ),
+  RMSE = c(
+    accuracy_naive_us["Training set", "RMSE"], accuracy_avg_us["Training set", "RMSE"], accuracy_ets_us["Training set", "RMSE"], accuracy_hw_us["Training set", "RMSE"],
+    accuracy_naive_am["Training set", "RMSE"], accuracy_avg_am["Training set", "RMSE"], accuracy_ets_am["Training set", "RMSE"], accuracy_hw_am["Training set", "RMSE"],
+    accuracy_naive_ha["Training set", "RMSE"], accuracy_avg_ha["Training set", "RMSE"], accuracy_ets_ha["Training set", "RMSE"], accuracy_hw_ha["Training set", "RMSE"]
+  ),
+  MAE = c(
+    accuracy_naive_us["Training set", "MAE"], accuracy_avg_us["Training set", "MAE"], accuracy_ets_us["Training set", "MAE"], accuracy_hw_us["Training set", "MAE"],
+    accuracy_naive_am["Training set", "MAE"], accuracy_avg_am["Training set", "MAE"], accuracy_ets_am["Training set", "MAE"], accuracy_hw_am["Training set", "MAE"],
+    accuracy_naive_ha["Training set", "MAE"], accuracy_avg_ha["Training set", "MAE"], accuracy_ets_ha["Training set", "MAE"], accuracy_hw_ha["Training set", "MAE"]
+  ),
+  MPE = c(
+    accuracy_naive_us["Training set", "MPE"], accuracy_avg_us["Training set", "MPE"], accuracy_ets_us["Training set", "MPE"], accuracy_hw_us["Training set", "MPE"],
+    accuracy_naive_am["Training set", "MPE"], accuracy_avg_am["Training set", "MPE"], accuracy_ets_am["Training set", "MPE"], accuracy_hw_am["Training set", "MPE"],
+    accuracy_naive_ha["Training set", "MPE"], accuracy_avg_ha["Training set", "MPE"], accuracy_ets_ha["Training set", "MPE"], accuracy_hw_ha["Training set", "MPE"]
+  ),
+  MAPE = c(
+    accuracy_naive_us["Training set", "MAPE"], accuracy_avg_us["Training set", "MAPE"], accuracy_ets_us["Training set", "MAPE"], accuracy_hw_us["Training set", "MAPE"],
+    accuracy_naive_am["Training set", "MAPE"], accuracy_avg_am["Training set", "MAPE"], accuracy_ets_am["Training set", "MAPE"], accuracy_hw_am["Training set", "MAPE"],
+    accuracy_naive_ha["Training set", "MAPE"], accuracy_avg_ha["Training set", "MAPE"], accuracy_ets_ha["Training set", "MAPE"], accuracy_hw_ha["Training set", "MAPE"]
+  ),
+  MASE = c(
+    accuracy_naive_us["Training set", "MASE"], accuracy_avg_us["Training set", "MASE"], accuracy_ets_us["Training set", "MASE"], accuracy_hw_us["Training set", "MASE"],
+    accuracy_naive_am["Training set", "MASE"], accuracy_avg_am["Training set", "MASE"], accuracy_ets_am["Training set", "MASE"], accuracy_hw_am["Training set", "MASE"],
+    accuracy_naive_ha["Training set", "MASE"], accuracy_avg_ha["Training set", "MASE"], accuracy_ets_ha["Training set", "MASE"], accuracy_hw_ha["Training set", "MASE"]
+  )
+)
+
+# Display the accuracy data frame
+print(accuracy_data)
+
+# Optional: Rank models based on each metric
+accuracy_table <- accuracy_data %>%
+  group_by(Airline) %>%
+  mutate(
+    ME_Rank = rank(ME),
+    RMSE_Rank = rank(RMSE),
+    MAE_Rank = rank(MAE),
+    MPE_Rank = rank(MPE),
+    MAPE_Rank = rank(MAPE),
+    MASE_Rank = rank(MASE)
+  )
+
+# Display the ranked table
+print(accuracy_table)
+```
+
+**ETS** is consistently the best-performing model across all three airlines.
+
+#### Forecast of baggage complaints
+```{r}
+par(mfrow = c(1, 3))
+
+plot(forecast(ets_united, h = 12), main = "ETS Forecast: United Airlines", xlab = "Year", ylab = "Complaints")
+
+plot(forecast(ets_american, h = 12), main = "ETS Forecast: American Eagle", xlab = "Year", ylab = "Complaints")
+
+plot(forecast(ets_hawaiian, h = 12), main = "ETS Forecast: Hawaiian Airlines", xlab = "Year", ylab = "Complaints")
+
+```
+
+#### Conclusion 
+
+**United Airlines**
+
+- The forecast suggests that baggage complaints will generally go down over time, but there will still be some increases during busy months, like holidays or peak travel seasons.
+- Complaints are expected to be highest in December and July, when many people are traveling, and lowest in February and September, which are quieter months.
+- The predictions are reliable, with only a small chance of error, so United can use them confidently for planning.
+
+**American Eagle**
+
+- Complaints are expected to level out over time, with a slight decrease, showing that American Eagle is making improvements. However, there may still be occasional spikes in complaints during certain months.
+-	The seasonal pattern isn’t as strong as United’s, but there could still be a small increase in complaints during summer months.
+-	The forecast is moderately reliable, so while the predictions are helpful, there’s still a chance of unexpected changes.
+
+**Hawaiian Airlines**
+
+- Complaints are predicted to stay stable over the next year, around 2,000 per month, with minimal seasonal changes.
+- Hawaiian has fewer fluctuations compared to United and American Eagle, so there’s less risk of unexpected complaint spikes.
+- The forecast is less precise because the data is very stable and doesn't have a clear trend or strong seasonality, but overall, Hawaiian Airlines seems consistent.
+
+#### Decision Based on Analysis
+1.	**United Airlines**:
+Focus on Peak Travel Seasons:
+United should prioritize improving baggage handling during high-complaint months like December and July. The seasonal pattern is strong, so targeted measures during peak periods will have the most impact on reducing complaints.
+2.	**American Eagle**:
+Sustain Gradual Improvements:
+With complaints stabilizing and a slight downward trend, American Eagle should continue its improvement strategies while preparing for occasional spikes, especially in summer months.
+3.	**Hawaiian Airlines**:
+Maintain Current Operations:
+Hawaiian Airlines demonstrates consistent performance with minimal seasonal changes. The focus should remain on sustaining this stability while looking for opportunities to further optimize operations.
+
